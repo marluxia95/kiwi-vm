@@ -64,12 +64,12 @@ string int_to_hex( T i )
   return stream.str();
 }
 
-int assembler::createInstruction(string name, int code,int argType) {
+instruction assembler::createInstruction(string name, int code, vector<int> arguments) {
     writtenInstructions++;
     instructions[writtenInstructions].name = name;
     instructions[writtenInstructions].code = code;
-    instructions[writtenInstructions].argType = argType;
-    return writtenInstructions;
+    instructions[writtenInstructions].arguments = arguments;
+    return instructions[writtenInstructions];
 }
 
 int assembler::createSection(string name, vector<int> header) {
@@ -83,23 +83,24 @@ void assembler::init(){
     /*
      *      Instruction declaration
      */
-    createInstruction("ADD", 0x20,1);
-    createInstruction("SUB", 0x21,1);
-    createInstruction("MUL", 0x22,1);
-    createInstruction("DIV", 0x23,1);
+     
+    createInstruction("ADD", 0x20, {1});
+    createInstruction("SUB", 0x21, {1});
+    createInstruction("MUL", 0x22, {1});
+    createInstruction("DIV", 0x23, {1});
     
+    createInstruction("MOV", 0x40, {1,1});
+    createInstruction("ACC", 0x41, {1});
     
-    createInstruction("MOV", 0x40,1);
-    createInstruction("ACC", 0x41,1);
+    createInstruction("JMP", 0x80, {2});
+    createInstruction("JNE", 0x81, {1,2});
+    createInstruction("JEQ", 0x82, {1,2});
+
     
-    createInstruction("JMP", 0x80,2);
-    createInstruction("JNE", 0x81,2);
-    createInstruction("JEQ", 0x82,2);
-    createInstruction("GOTO", 0x83,2);
+    createInstruction("HLT", 0xFF, {});
     
-    createInstruction("HLT", 0xFF,0);
-    
-    createInstruction("NULL", 0x00,0);
+    createInstruction("NULL", 0x00, {});
+
     
     /*
      *      Section Declaration
@@ -114,11 +115,11 @@ void assembler::init(){
     
 }
 
-bool assembler::checkIfInstructionExists ( string name ) {
+bool assembler::checkIfInstructionExists ( string instructionName ) {
     
     for ( int x = 0; x != writtenInstructions; x++ ) {
 
-        if ( name == instructions[x].name ) {
+        if ( instructionName == instructions[x].name ) {
             
             return true;
             
@@ -132,9 +133,9 @@ bool assembler::checkIfInstructionExists ( string name ) {
 
 int assembler::getInstructionCode ( string instructionName ) {
     
-    for ( int x = 0; x != writtenInstructions; x++ ) {
+    for ( int x = 1; x != writtenInstructions; x++ ) {
         if ( instructionName == instructions[x].name ) {
-
+            cout << "CORRECT " << instructions[x].code << endl;
             return instructions[x].code;
             
         }
@@ -145,18 +146,34 @@ int assembler::getInstructionCode ( string instructionName ) {
     
 }
 
-int assembler::getInstructionArgType ( string instructionName ) {
+int assembler::getInstructionArgType ( string instructionName, int argument ) {
     
-    for ( int x = 0; x != writtenInstructions; x++ ) {
+    for ( int x = 1; x <= writtenInstructions; x++ ) {
         if ( instructionName == instructions[x].name ) {
 
-            return instructions[x].argType;
+            return instructions[x].arguments[argument];
             
         }
         
     } 
     
     return 0x00;
+    
+}
+
+int assembler::getInstructionArgCount ( string instructionName ) {
+    
+    for ( int x = 1; x <= writtenInstructions; x++ ) {
+        
+        if ( instructionName == instructions[x].name ) {
+            cout << "CORRECT " << instructions[x].arguments.size() << endl;
+            return instructions[x].arguments.size();
+            
+        }
+        
+    } 
+    
+    return 0;
     
 }
 
@@ -224,14 +241,15 @@ vector<int> assembler::getDataArgs ( string line, string instruction ) {
 
     vector<int> args;
     
-    int argumentType = getInstructionArgType(instruction);
-    cout << "Its argument type is " << argumentType << " so ";
     
-    for(std::vector<string>::size_type i = 1; i != rawArgs.size(); i++) {  
+    int argumentCount = getInstructionArgCount(instruction);
+    if(debug){cout << "Count " << argumentCount << endl;}
+    for(std::vector<string>::size_type i = 1; i != argumentCount+1; i++) {  
             if(rawArgs[i]==";"){break;} // ignore comments
+            int argumentType = getInstructionArgType(instruction, i-1);
+            
             switch(argumentType){
                 case 1:{ // Integer 
-                    cout << "it needs an integer value " << endl;
                     int arg;
                     
                     istringstream(rawArgs[i]) >> arg;
@@ -240,7 +258,6 @@ vector<int> assembler::getDataArgs ( string line, string instruction ) {
                     break;
                 }
                 case 2:{ // Memory Address, pointer
-                    cout << "it needs a pointer value " << endl;
                     int rawAddress;
                     vector<int> hexPointer;
                     istringstream(rawArgs[i]) >> rawAddress;
@@ -302,12 +319,13 @@ vector<int> assembler::convertInstruction ( string line ) {
             int instructionCode = getInstructionCode(data[0]);
 
             converted.push_back(instructionCode);
+            cout << "code: " << instructionCode << endl;
             // Convert Arguments into hexcode
             for(std::vector<int>::size_type i = 0; i != args.size(); i++) {  
                 if(data[i] == ";"){break;}
-                cout << "Argument : " << data[i] << endl;
+                if(debug){cout << "Argument : " << data[i] << endl;}
                 converted.push_back(args[i]);
-                
+
             }
         }else{
             if(data[0].at(0) == '.'){
@@ -332,7 +350,7 @@ vector<int> assembler::convertInstruction ( string line ) {
             }else if(data[0].at(0) == 'x'){
                 int address = getAddress(data[0]);
                 
-                cout << "Variable Address : " << address << endl;
+                if(debug){cout << "Variable Address : " << address << endl;}
                 
             }
             
@@ -388,17 +406,16 @@ string assembler::assemblyToString ( vector<int> code ) {
 vector<int> assembler::assemble ( string code ) {
     vector<int> assembled;
     vector<string> instructions = splitter(R"(\n)", code);
-    cout << instructions.size() << endl;
+    if(debug){cout << instructions.size() << endl;}
     for(std::vector<int>::size_type i = 0; i != instructions.size(); i++) { 
-        cout << "Instruction " << instructions[i] << endl;
+        if(debug){cout << "Instruction " << instructions[i] << endl;}
         vector<int> assembledInstruction = convertInstruction ( instructions[i] );
         for(std::vector<int>::size_type d = 0; d != assembledInstruction.size(); d++) { 
-            cout << "Argument " << assembledInstruction[d] << endl;
+            //if(debug){cout << "Argument " << assembledInstruction[d] << endl;}
             assembled.push_back(assembledInstruction[d]);
         }
         
     }
-    cout << "Assembly Finished ! : " << endl;
     return assembled;
 }
 
@@ -417,7 +434,7 @@ vector<int> assembler::generatePointer (int address) {
     
     result.push_back(hex1);
     result.push_back(hex2);
-    cout << "Hexadecimal number for address : " << hexAddress << " " << " " << endl;
+    if(debug){cout << "Hexadecimal number for address : " << hexAddress << " " << " " << endl;}
     return result;
 }
 
@@ -425,16 +442,16 @@ vector<int> assembler::generatePointer (int address) {
 int assembler::exportToBin (vector<int> assembledCode, string path) {
     ofstream bin(path, ios::out | ios::binary);
     if(!bin) {
-        cout << "Cannot open file!" << endl;
+        cerr << "Cannot open file!";
         return 0;
     }
     for(std::vector<int>::size_type i = 0; i < assembledCode.size(); i++) {
         bin.write ((char*)&assembledCode[i],1);
-        cout << "Write : " << assembledCode[i] << endl;
+        if(debug){cout << "Write : " << assembledCode[i] << endl;}
     }
     bin.close();
     if(!bin.good()) {
-      cout << "Error occurred at writing to binary file !" << endl;
+      cerr << "Error occurred at writing to binary file !";
       return 0;
     }
     cout << "Successfully exported to binary file " << endl;

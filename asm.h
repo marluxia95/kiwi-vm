@@ -9,11 +9,13 @@
 #include <stdio.h>
 using namespace std;
 
+
+
 class instruction {
     public:
         string name;
         int code;
-        int argType;
+        vector<int> arguments;
 };
 
 class section {
@@ -29,15 +31,17 @@ class assembler {
     
     public:
         int exportToBin (vector<int> assembledCode, string path);
-        int createInstruction(string name, int code, int argType);
         int createSection(string name, vector<int> header);
+        bool debug;
         bool checkIfInstructionExists ( string name );
         void init();
         string assemblyToString(vector<int> code);
         vector<int> assemble (string code);
+        instruction createInstruction(string name, int code, vector<int> arguments);
     private:
         int getInstructionCode ( string instructionName ); 
-        int getInstructionArgType (string instruction);
+        int getInstructionArgType (string instructionName, int argument);
+        int getInstructionArgCount ( string instructionName );
         int getAddress ( string variable );
         string getSectionName (string line);
         string removeSpaces( string line );

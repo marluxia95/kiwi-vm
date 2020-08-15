@@ -19,6 +19,7 @@ class cpu {
         int registers = 0x0011; 
         int codePos = 0x0100;
         int videoMem = 0xF000;
+        bool debug = false;
         void init ();
         void memoryDump (int bufferSize);
         

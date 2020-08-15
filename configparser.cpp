@@ -2,27 +2,57 @@
 
 
 
-vector<string> config::readFile(string path){
-    vector<string> data;
-    ifstream configFile (path);
-    string line;
-    if (configFile.is_open())
-    {
-        while ( getline (configFile,line) )
-        {
-            data.push_back(line);
-            cout << line << endl;
-        }
-        configFile.close();
-    }
-    else{cerr << "Error : Couldnt Open Config File ! ";}
+void configParser::readConfig(string path){
+    ifstream cFile (path);
     
-    return data;
+    if (cFile.is_open())
+    {
+        string line;
+        while(getline(cFile, line)){
+            line.erase(std::remove_if(line.begin(), line.end(), ::isspace),
+                                 line.end());
+            if(line[0] == '#' || line.empty()) // ignore comments
+                continue;
+            auto delimiterPos = line.find("=");
+            auto name = line.substr(0, delimiterPos);
+            auto value = line.substr(delimiterPos + 1);
+            updateValue ( name , value );
+        }
+        
+    }
+    else {
+        cerr << "Couldn't open config file for reading.\n";
+    }
     
 }
 
-void config::init() { 
-    readFile(CONFIG_PATH);
+
+void configParser::createValue(string name) {
+    TotalValues++;
+    values[TotalValues].name = name;
+    
+}
+
+bool configParser::updateValue ( string name, string value ) {
+    for ( int x = 0; x != TotalValues; x++ ) {
+        if ( name == values[x].name ) {
+            values[x].value = value;
+            return true;
+        }
+        
+    } 
+    
+    return false;
+    
+}
+
+
+void configParser::init() { 
+    
+    createValue("SysRomPath");
+    
+
+    
     
     
 }

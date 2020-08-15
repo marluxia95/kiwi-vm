@@ -64,11 +64,11 @@ int cpu::load ( vector<int> code ) { // load assembly code to RAM
     int codeAddress;
     int dataAddress;
     for ( std::vector<int>::size_type x = 0; x != size; x++) {
-        if ( code[x] > 0xFF ) { cout << "Error ! Hexcode exceeded limit ( 0xFF )" << endl; return 0; }
+        if ( code[x] > 0xFF ) { cerr << "Error ! Hexcode exceeded limit ( 0xFF )"; return 0; }
         if ( code[x] == 0xFF && code[x+1] == 0x1B ) {
             currentSector = 1;
             codeAddress = getAddress( code[x+2], code[x+3] );
-            cout << "Got code address : " << codeAddress << endl;
+            if(debug){cout << "Got code address : " << codeAddress << endl;}
             x += 3;
         }else if ( code[x] == 0xFF && code[x+1] == 0x1A ) {
             currentSector = 2;
@@ -79,10 +79,10 @@ int cpu::load ( vector<int> code ) { // load assembly code to RAM
         if( currentSector == 1 ) {
             
             memory[codeAddress + x - 3] = code[x];
-            cout << "Copying code" << int_to_hex_1byte(code[x]) << " to " << codeAddress + x << endl;
+            if(debug){cout << "Copying code" << int_to_hex_1byte(code[x]) << " to " << codeAddress + x << endl;}
         }else if( currentSector == 2 ) {
             memory[dataAddress + x] = code[x];
-            cout << "Copying data to " << dataAddress + x << endl;
+            if(debug){cout << "Copying data to " << dataAddress + x << endl;}
             
         }
     }
@@ -117,32 +117,32 @@ int cpu::run (int address) {
     while(address < 0x01FF){
         //currentAddress = instruction+address;
         //cout << instruction << "( " << currentAddress << " ) " << " -> ";
-        cout << address <<  " -> ";
+        if(debug){cout << address <<  " -> ";}
         switch( memory[address] ) {
             case 0x20:{ // add
                 int number = memory[address+1];
                 memory[cpu::acc] = memory[cpu::acc] + memory[cpu::registers+number];
-                cout << "ADD " << memory[cpu::registers+number] << " result " << memory[cpu::acc];
+                if(debug){cout << "ADD " << memory[cpu::registers+number] << " result " << memory[cpu::acc];}
             }break;
             case 0x21:{ // sub
                 int number = memory[address+1];
                 memory[cpu::acc] = memory[cpu::acc] - memory[cpu::registers+number];
-                cout << "SUB " << memory[cpu::registers+number] << " to " << memory[cpu::acc];
+                if(debug){cout << "SUB " << memory[cpu::registers+number] << " to " << memory[cpu::acc];}
             }break;
             case 0x22:{ // mul
                 int number = memory[address+1];
                 memory[cpu::acc] = memory[cpu::acc] * memory[cpu::registers+number];
-                cout << "MUL " << memory[cpu::registers+number] << " to " << memory[cpu::acc];
+                if(debug){cout << "MUL " << memory[cpu::registers+number] << " to " << memory[cpu::acc];}
             }break;
             case 0x23:{ // div
                 int number = memory[address+1];
                 memory[cpu::acc] = memory[cpu::acc] / memory[cpu::registers+number];
-                cout << "DIV " << memory[cpu::registers+number] << " to " << memory[cpu::acc];
+                if(debug){cout << "DIV " << memory[cpu::registers+number] << " to " << memory[cpu::acc];}
             }break;
             case 0x40:{ // mov
                 int number = memory[address+1];
                 int target = memory[address+2];
-                cout << "MOV " << number << " to " << target;
+                if(debug){cout << "MOV " << number << " to " << target;}
                 memory[cpu::registers+target] = number;
                 //instruction+=2;
                 address+=2;
@@ -150,16 +150,15 @@ int cpu::run (int address) {
             case 0x41:{ // acc
                 int number = memory[address+1];
                 memory[cpu::acc] = number;
-                cout << "ACC " << number;
-                //instruction++;
-                address+=2;
+                if(debug){cout << "ACC " << number;}
+                address++;
                 
             }break;
             case 0x80:{ // jmp
                 vector<int> pointer = { memory[address+1], memory[address+2] };
                 int target = getPointerAddress(pointer);
                 
-                cout << "JMP " << target;
+                if(debug){cout << "JMP " << target;}
                 //instruction = target;
                 address = target;
             }break;
@@ -168,9 +167,9 @@ int cpu::run (int address) {
                 vector <int> pointer = { memory[address+2], memory[address+3] };
                 //cout << pointer[0] << " " << pointer[1];
                 int target = getPointerAddress(pointer);
-                cout << "JNE " << value << " " << target;
+                if(debug){cout << "JNE " << value << " " << target;}
                 if(memory[cpu::acc]!=value){
-                    cout << endl << "Not equal" << endl;
+                    if(debug){cout << endl << "Not equal" << endl;}
                     //instruction = target;
                     address = target;
                 }else{
@@ -186,7 +185,7 @@ int cpu::run (int address) {
             }break;
             
         }
-        cout << endl;
+        if(debug){cout << endl;}
         address++;
         
     }

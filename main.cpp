@@ -3,10 +3,19 @@
 #include <stdio.h>
 #include <asm.h>
 #include <cpu.h>
+#include <configparser.h>
 
-#define VER 0.1
 
-// 0xFF, 0x1B, 0x02, 0x00, 0x40, 0x02, 0x01, 0x41, 0x02, 0x20, 0x01, 0xFF ( 2 + 2 ) 
+#define VER 0.2
+
+#define MAIN_CONFIG_PATH "vm.conf"
+
+bool debug = false;
+
+
+typedef unsigned char BYTE;
+
+
 template< typename T >
 string int_to_hex_1byte( T i )
 {
@@ -18,12 +27,12 @@ string int_to_hex_1byte( T i )
 
 void showHelp (string cmd) {
     cout << " Kiwi VM v" << VER << endl;
-    cout << " Usage : " << cmd << " " << endl;
+    cout << " Usage : ./kiwi_vm " << endl;
     cout << " -r [FILE] : Runs a binary file ( MUST BE BINARY ) " << endl;
     cout << " -c [FILE] [OUT] : Assembles a file and exports it into a binary file" << endl;
-    cout << " --dump : Shows a memory dump at end of code " << endl;
+    cout << " --debug : Enables debug mode " << endl;
 }
-
+/*
 vector<int> loadBin ( string path ){
     vector<int> code;
 
@@ -41,16 +50,56 @@ vector<int> loadBin ( string path ){
     }
     return code;
 }
+*/
+std::vector<BYTE> loadBin(string path){
+    // open the file:
+    std::ifstream file(path, std::ios::binary);
+
+    // Stop eating new lines in binary mode!!!
+    file.unsetf(std::ios::skipws);
+
+    // get its size:
+    std::streampos fileSize;
+
+    file.seekg(0, std::ios::end);
+    fileSize = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    // reserve capacity
+    std::vector<BYTE> vec;
+    vec.reserve(fileSize);
+
+    // read the data:
+    vec.insert(vec.begin(),
+               std::istream_iterator<BYTE>(file),
+               std::istream_iterator<BYTE>());
+    
+    return vec;
+}
 void assembleToBin( string code, string path ) {
     assembler kasm;
     kasm.init();
-    cout << "Assembling ..." << endl;
+    kasm.debug = debug;
     vector<int> hexCode = kasm.assemble( code );
-    cout << "Exporting ...." << endl;
     kasm.exportToBin(hexCode, path);
     
 }
 
+void run (cpu machine, vector<int> bin){
+    cout << "Loading virtual machine ... " << endl;
+    machine.init();
+    cout << "Uploading code to ram .. " << endl;
+    machine.load(bin);
+        
+    cout << "Running .. " << endl;
+    machine.run(0x0100); // default code position
+        
+    if( machine.debug == true ) {
+        cout << "Memory dump : " << endl;
+        machine.memoryDump(32); // 32 bytes per line
+    }
+    
+}
 
 string readFile (string path) {
     string code;
@@ -60,9 +109,9 @@ string readFile (string path) {
     {
         while ( getline (codeFile,line) )
         {
+            if(debug){cout << line << endl;}
             code.append(line);
             code.append("\n");
-            cout << line << endl;
         }
         codeFile.close();
     }
@@ -73,66 +122,50 @@ string readFile (string path) {
 }
 
 int main (int argc, char* argv[]) {
+    configParser config;
+    config.init();
     
-    int dumpMode = 0;
     string runFile;
     string compileIn;
     string compileOut;
     
-    cout << "EE" << endl;
+    cpu virtualMachine;
+
+
     for (int i = 1; i < argc; i++) {
-        if (std::string(argv[i]) == "--dump") {
-            dumpMode = 1;
+        if (std::string(argv[i]) == "--debug") {
+            virtualMachine.debug = true;
+            debug = true;
         } 
     }
     
     if (std::string(argv[1]) == "-r" && argc>=3) {
         
         runFile = argv[2];
-        vector<int> machineCode = loadBin( runFile );
-        
-        cout << "Loading virtual machine ... " << endl;
-        cpu virtualMachine;
-        virtualMachine.init();
-        cout << "Uploading code to ram .. " << endl;
-        virtualMachine.load(machineCode);
-        
-        cout << "Running .. " << endl;
-        virtualMachine.run(0x0100);
-        
-        if( dumpMode ) {
-            cout << "Memory dump : " << endl;
-            virtualMachine.memoryDump(32);
+        vector<BYTE> rawCode = loadBin( runFile );
+        vector<int> machineCode;
+        for ( int x = 0; x != rawCode.size(); x++ ) {
+            int hexCode = (int)rawCode[x];
+            machineCode.push_back(hexCode);
         }
+        
+        
+        run(virtualMachine, machineCode);
         
         
     } 
 
     if (std::string(argv[1]) == "--loopexample") {
         
-        runFile = argv[2];
-        vector<int> code = { 0xFF, 0x1B, 0x01, 0x01, 0x40, 0x02, 0x01, 0x41, 0x02, 0x20, 0x01, 0x81, 0x06 , 0x01,0x6, 0xFF  };
-
+        //vector<int> code = { 0xFF, 0x1B, 0x01, 0x01, 0x40, 0x02, 0x01, 0x41, 0x02, 0x20, 0x01, 0x81, 0x06 , 0x01,0x6, 0xFF  };
+        vector<int> code = { 0xFF, 0x1B, 0x01, 0x01, 0x40, 0x02, 0x01, 0x41, 0x02, 0x20, 0x01, 0xff };
         
-        cout << "Loading virtual machine ... " << endl;
-        cpu virtualMachine;
-        virtualMachine.init();
-        cout << "Uploading code to ram .. " << endl;
-        virtualMachine.load(code);
-        
-        cout << "Running .. " << endl;
-        virtualMachine.run(0x0100);
-        
-        if( dumpMode ) {
-            cout << "Memory dump : " << endl;
-            virtualMachine.memoryDump(32);
-        }
+        run(virtualMachine, code);
         
         
     } 
     
     if (std::string(argv[1]) == "-c") {
-        cout << "Compile Mode selected" << endl;
         compileIn = argv[2];
         compileOut = argv[3];
         

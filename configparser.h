@@ -2,20 +2,32 @@
 #include <vector>
 #include <fstream>
 #include <string>
+#include <algorithm>
 #include <stdio.h>
-#define CONFIG_PATH "/etc/kiwi/vm.conf"
+
 
 
 using namespace std;
 
-class config {
+class confvalue {
+    public:
+        string name;
+        string value;
+        
+};
+
+class configParser {
     public:
         void init ();
-        const char* rom_path;
-        const char* loader_path;
-        int ramAmmount;
         
     private:
-        vector<string> readFile(string path);
+        int TotalValues;
+        void readConfig(string path);
+        void createValue ( string name);
+        bool updateValue ( string name, string value );
+        confvalue values[0xFF];
         vector<string> configData;
+        
+        
+        
 };
