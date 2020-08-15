@@ -163,7 +163,8 @@ int cpu::run (int address) {
                 address = target;
             }break;
             case 0x81:{ // jne
-                int value = memory[address+1];
+                int registerNumber = memory[address+1];
+                int value = memory[cpu::registers+registerNumber];
                 vector <int> pointer = { memory[address+2], memory[address+3] };
                 //cout << pointer[0] << " " << pointer[1];
                 int target = getPointerAddress(pointer);
