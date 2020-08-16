@@ -1,20 +1,32 @@
+#include "SDL.h"
 #include <iostream>
+#include <vector>
+#include <regex>
+#include <algorithm>
+#include <iterator>
 #include <fstream>
+#include <string>
+#include <bits/stdc++.h> 
 #include <stdio.h>
-#include <asm.h>
+
 #include <cpu.h>
+#include <asm.h>
 #include <configparser.h>
 
-
 #define VER 0.2
+#define WINDOW_WIDTH 640
+#define WINDOW_HEIGHT 480
+
+using namespace std;
+
+int running;
+SDL_Window *window;
+SDL_Renderer *renderer;
 
 #define MAIN_CONFIG_PATH "vm.conf"
-
-bool debug = false;
-
-
 typedef unsigned char BYTE;
-
+ 
+bool debug = false;
 
 template< typename T >
 string int_to_hex_1byte( T i )
@@ -25,32 +37,6 @@ string int_to_hex_1byte( T i )
   return stream.str();
 }
 
-void showHelp (string cmd) {
-    cout << " Kiwi VM v" << VER << endl;
-    cout << " Usage : ./kiwi_vm " << endl;
-    cout << " -r [FILE] : Runs a binary file ( MUST BE BINARY ) " << endl;
-    cout << " -c [FILE] [OUT] : Assembles a file and exports it into a binary file" << endl;
-    cout << " --debug : Enables debug mode " << endl;
-}
-/*
-vector<int> loadBin ( string path ){
-    vector<int> code;
-
-    ifstream in(path, ios::out | ios::binary);
-    if( in.fail() ) throw 0;
-    vector<char> const charCode(
-        (istreambuf_iterator<char>(in)),
-        (istreambuf_iterator<char>())
-        );
-    cout << charCode.size() << " bytes." << endl;
-    code.resize(charCode.size());
-    int converted;
-    for(std::vector<char>::size_type i = 0; i != charCode.size(); i++) {  
-        cout << int_to_hex_1byte(code[i]) << endl;
-    }
-    return code;
-}
-*/
 std::vector<BYTE> loadBin(string path){
     // open the file:
     std::ifstream file(path, std::ios::binary);
@@ -85,22 +71,6 @@ void assembleToBin( string code, string path ) {
     
 }
 
-void run (cpu machine, vector<int> bin){
-    cout << "Loading virtual machine ... " << endl;
-    machine.init();
-    cout << "Uploading code to ram .. " << endl;
-    machine.load(bin);
-        
-    cout << "Running .. " << endl;
-    machine.run(0x0100); // default code position
-        
-    if( machine.debug == true ) {
-        cout << "Memory dump : " << endl;
-        machine.memoryDump(32); // 32 bytes per line
-    }
-    
-}
-
 string readFile (string path) {
     string code;
     ifstream codeFile (path);
@@ -121,6 +91,59 @@ string readFile (string path) {
     
 }
 
+void showHelp (string cmd) {
+    cout << " Kiwi VM v" << VER << endl;
+    cout << " Usage : ./kiwi_vm " << endl;
+    cout << " -r [FILE] : Runs a binary file ( MUST BE BINARY ) " << endl;
+    cout << " -c [FILE] [OUT] : Assembles a file and exports it into a binary file" << endl;
+    cout << " --debug : Enables debug mode " << endl;
+}
+
+void run (cpu machine, vector<int> bin) {
+    if (SDL_Init(SDL_INIT_VIDEO|SDL_INIT_GAMECONTROLLER) >= 0) {
+        window = SDL_CreateWindow("Kiwi_VM", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
+        if (window) {
+            renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED|SDL_RENDERER_PRESENTVSYNC);
+            if (renderer) {
+                SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND);
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0 , 255);
+                SDL_RenderClear(renderer);
+                SDL_SetRenderDrawColor(renderer, 255, 0, 0 , 255);
+                int i;
+                for (i = 0; i < WINDOW_WIDTH; ++i)
+                    SDL_RenderDrawPoint(renderer, i, i);
+                cout << "Loading virtual machine ... " << endl;
+                machine.init();
+                cout << "Uploading code to ram .. " << endl;
+                machine.load(bin);
+                    
+                cout << "Running .. " << endl;
+                machine.run(0x0100); // default code position
+                running = 1;
+                if( machine.debug == true ) {
+                    cout << "Memory dump : " << endl;
+                    machine.memoryDump(32); // 32 bytes per line
+                }
+                while (running) {
+                    SDL_RenderDrawPoint(renderer, i, i);
+                    SDL_Event event;
+                    while (SDL_PollEvent(&event)) {
+                        switch (event.type) {
+                            case SDL_QUIT: {
+                                running = 0;
+                            } break;
+                        }
+                    }
+                    
+                    SDL_RenderPresent(renderer);
+                    
+                }
+                
+            }
+        }
+    }
+}
+
 int main (int argc, char* argv[]) {
     configParser config;
     config.init();
@@ -129,12 +152,12 @@ int main (int argc, char* argv[]) {
     string compileIn;
     string compileOut;
     
-    cpu virtualMachine;
+    cpu machine;
 
 
     for (int i = 1; i < argc; i++) {
         if (std::string(argv[i]) == "--debug") {
-            virtualMachine.debug = true;
+            machine.debug = true;
             debug = true;
         } 
     }
@@ -149,9 +172,11 @@ int main (int argc, char* argv[]) {
             machineCode.push_back(hexCode);
         }
         
-        
-        run(virtualMachine, machineCode);
-        
+        run(machine, machineCode);
+        SDL_DestroyRenderer(renderer);
+        SDL_DestroyWindow(window);
+        SDL_Quit();
+        return EXIT_SUCCESS;
         
     } 
 
@@ -160,7 +185,7 @@ int main (int argc, char* argv[]) {
         //vector<int> code = { 0xFF, 0x1B, 0x01, 0x01, 0x40, 0x02, 0x01, 0x41, 0x02, 0x20, 0x01, 0x81, 0x06 , 0x01,0x6, 0xFF  };
         vector<int> code = { 0xFF, 0x1B, 0x01, 0x01, 0x40, 0x02, 0x01, 0x41, 0x02, 0x20, 0x01, 0xff };
         
-        run(virtualMachine, code);
+        run(machine, code);
         
         
     } 

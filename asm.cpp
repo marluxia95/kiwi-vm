@@ -82,6 +82,12 @@ int assembler::createSection(string name, vector<int> header) {
 void assembler::init(){
     /*
      *      Instruction declaration
+     * 
+     *      createInstuction( Name, Code, { } -> Arguments are :
+     *                                              1 for integer
+     *                                              2 for register
+     *                                              3 for pointer
+     *                                              4 for bytearray
      */
      
     createInstruction("ADD", 0x20, {1});
@@ -89,8 +95,13 @@ void assembler::init(){
     createInstruction("MUL", 0x22, {1});
     createInstruction("DIV", 0x23, {1});
     
-    createInstruction("MOV", 0x40, {1,1});
-    createInstruction("ACC", 0x41, {1});
+    createInstruction("MOV", 0x40, {1,2});/*
+    createInstruction("MOV", 0x41, {1,3});
+    createInstruction("MOV", 0x42, {2,2});
+    createInstruction("MOV", 0x43, {2,3});
+    createInstruction("MOV", 0x44, {3,3});
+    createInstruction("MOV", 0x45, {3,2});*/
+    createInstruction("ACC", 0x46, {1});
     
     createInstruction("JMP", 0x80, {2});
     createInstruction("JNE", 0x81, {1,2});
@@ -438,6 +449,14 @@ vector<int> assembler::generatePointer (int address) {
     return result;
 }
 
+string getPointerValue ( string argument ) {
+    string pointerVal;
+    if(argument.at(0)!="$"){return "";}
+    for(x=1, 4 ) {
+        pointerVal.push_back(argument.at(x));
+    }
+    return pointerVal;
+}
 
 int assembler::exportToBin (vector<int> assembledCode, string path) {
     ofstream bin(path, ios::out | ios::binary);
